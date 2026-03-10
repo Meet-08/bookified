@@ -1,0 +1,1 @@
+ALTER TABLE "books" ALTER COLUMN "cover_url" SET NOT NULL;

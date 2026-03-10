@@ -85,6 +85,7 @@ export function BookUploadForm() {
 													ref={pdfInputRef}
 													type="file"
 													accept=".pdf,application/pdf"
+													suppressHydrationWarning
 													className="hidden"
 													onChange={(e) => {
 														const file = e.target.files?.[0];
@@ -97,6 +98,7 @@ export function BookUploadForm() {
 													tabIndex={pdfFile ? -1 : 0}
 													aria-label="Upload PDF file"
 													aria-disabled={!!pdfFile}
+													suppressHydrationWarning
 													onClick={() =>
 														!pdfFile && pdfInputRef.current?.click()
 													}
@@ -120,6 +122,7 @@ export function BookUploadForm() {
 																type="button"
 																className="upload-dropzone-remove"
 																aria-label={`Remove ${(pdfFile as File).name}`}
+																suppressHydrationWarning
 																onClick={(e) => {
 																	e.stopPropagation();
 																	field.onChange(undefined);
@@ -162,6 +165,7 @@ export function BookUploadForm() {
 													ref={coverInputRef}
 													type="file"
 													accept="image/jpeg,image/jpg,image/png,image/webp"
+													suppressHydrationWarning
 													className="hidden"
 													onChange={(e) => {
 														const file = e.target.files?.[0];
@@ -174,6 +178,7 @@ export function BookUploadForm() {
 													tabIndex={coverImage ? -1 : 0}
 													aria-label="Upload cover image"
 													aria-disabled={!!coverImage}
+													suppressHydrationWarning
 													onClick={() =>
 														!coverImage && coverInputRef.current?.click()
 													}
@@ -197,6 +202,7 @@ export function BookUploadForm() {
 																type="button"
 																className="upload-dropzone-remove"
 																aria-label={`Remove ${(coverImage as File).name}`}
+																suppressHydrationWarning
 																onClick={(e) => {
 																	e.stopPropagation();
 																	field.onChange(undefined);
@@ -238,6 +244,7 @@ export function BookUploadForm() {
 												{...field}
 												className="form-input"
 												placeholder="ex: Rich Dad Poor Dad"
+												suppressHydrationWarning
 											/>
 										</FormControl>
 										<FormMessage />
@@ -257,6 +264,7 @@ export function BookUploadForm() {
 												{...field}
 												className="form-input"
 												placeholder="ex: Robert Kiyosaki"
+												suppressHydrationWarning
 											/>
 										</FormControl>
 										<FormMessage />
@@ -296,6 +304,7 @@ export function BookUploadForm() {
 																		checked={isSelected}
 																		onChange={() => field.onChange(key)}
 																		className="accent-[#663820] shrink-0 mt-0.5"
+																		suppressHydrationWarning
 																	/>
 																	<div className="min-w-0">
 																		<p className="font-semibold text-(--text-primary) text-sm leading-5">
@@ -333,6 +342,7 @@ export function BookUploadForm() {
 																		checked={isSelected}
 																		onChange={() => field.onChange(key)}
 																		className="accent-[#663820] shrink-0 mt-0.5"
+																		suppressHydrationWarning
 																	/>
 																	<div className="min-w-0">
 																		<p className="font-semibold text-(--text-primary) text-sm leading-5">
@@ -359,6 +369,7 @@ export function BookUploadForm() {
 								type="submit"
 								className="form-btn"
 								disabled={isSubmitting}
+								suppressHydrationWarning
 							>
 								Begin Synthesis
 							</button>

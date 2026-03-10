@@ -18,7 +18,7 @@ export const book = pgTable("books", {
 	persona: text(),
 	fileURL: text().notNull(),
 	fileBlobKey: text().notNull(),
-	coverURL: text(),
+	coverURL: text().notNull(),
 	coverBlobKey: text(),
 	fileSize: text().notNull(),
 	totalSegments: integer().default(0),
