@@ -6,6 +6,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 
 import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
+import { nitro } from "nitro/vite";
 import neon from "./neon-vite-plugin.ts";
 
 const config = defineConfig({
@@ -14,7 +15,8 @@ const config = defineConfig({
 		neon,
 		tsconfigPaths({ projects: ["./tsconfig.json"] }),
 		tailwindcss(),
-		tanstackStart({}),
+		tanstackStart(),
+		nitro({ preset: "vercel" }),
 		viteReact(),
 	],
 });

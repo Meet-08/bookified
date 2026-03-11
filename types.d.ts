@@ -1,7 +1,7 @@
+import type { book, bookSegment, voiceSession } from "#/db/schema";
 import { PlanType } from "@/lib/subscription-constants";
 import { UploadSchema } from "@/lib/zod";
 import { LucideIcon } from "lucide-react";
-import { Document, Types } from "mongoose";
 import { ReactNode } from "react";
 import { Control, FieldPath, FieldValues } from "react-hook-form";
 import z from "zod";
@@ -10,45 +10,12 @@ import z from "zod";
 // DATABASE MODELS
 // ============================================
 
-export interface IBook extends Document {
-  _id: Types.ObjectId;
-  clerkId: string;
-  title: string;
-  slug: string;
-  author: string;
-  persona?: string;
-  fileURL: string;
-  fileBlobKey: string;
-  coverURL: string;
-  coverBlobKey?: string;
-  fileSize: number;
-  totalSegments: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
+type Book = InferSelectModel<typeof book>;
 
-export interface IBookSegment extends Document {
-  clerkId: string;
-  bookId: Types.ObjectId;
-  content: string;
-  segmentIndex: number;
-  pageNumber?: number;
-  wordCount: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
+type BookSegment = InferSelectModel<typeof bookSegment>;
 
-export interface IVoiceSession extends Document {
-  _id: Types.ObjectId;
-  clerkId: string;
-  bookId: Types.ObjectId;
-  startedAt: Date;
-  endedAt?: Date;
-  durationSeconds: number;
-  billingPeriodStart: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+type VoiceSession = InferSelectModel<typeof voiceSession>;
+
 
 // ============================================
 // FORM & INPUT TYPES
