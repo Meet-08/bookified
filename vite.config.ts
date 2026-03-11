@@ -10,16 +10,13 @@ import { nitro } from "nitro/vite";
 import neon from "./neon-vite-plugin.ts";
 
 const config = defineConfig({
-	ssr: {
-		external: ["@clerk/ui"],
-	},
 	plugins: [
 		devtools(),
 		neon,
 		tsconfigPaths({ projects: ["./tsconfig.json"] }),
 		tailwindcss(),
 		tanstackStart(),
-		nitro({ preset: "bun" }),
+		nitro(),
 		viteReact(),
 	],
 });
