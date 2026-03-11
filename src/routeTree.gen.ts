@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BooksNewRouteImport } from './routes/books/new'
 import { Route as BooksSlugRouteImport } from './routes/books/$slug'
+import { Route as ApiUploadRouteImport } from './routes/api/upload'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,33 +29,42 @@ const BooksSlugRoute = BooksSlugRouteImport.update({
   path: '/books/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUploadRoute = ApiUploadRouteImport.update({
+  id: '/api/upload',
+  path: '/api/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/books/$slug' | '/books/new'
+  fullPaths: '/' | '/api/upload' | '/books/$slug' | '/books/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/books/$slug' | '/books/new'
-  id: '__root__' | '/' | '/books/$slug' | '/books/new'
+  to: '/' | '/api/upload' | '/books/$slug' | '/books/new'
+  id: '__root__' | '/' | '/api/upload' | '/books/$slug' | '/books/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiUploadRoute: typeof ApiUploadRoute
   BooksSlugRoute: typeof BooksSlugRoute
   BooksNewRoute: typeof BooksNewRoute
 }
@@ -82,11 +92,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BooksSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/upload': {
+      id: '/api/upload'
+      path: '/api/upload'
+      fullPath: '/api/upload'
+      preLoaderRoute: typeof ApiUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiUploadRoute: ApiUploadRoute,
   BooksSlugRoute: BooksSlugRoute,
   BooksNewRoute: BooksNewRoute,
 }
@@ -95,10 +113,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

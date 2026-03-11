@@ -1,20 +1,16 @@
 import { cn } from "#/lib/utils";
-import {
-	SignedIn,
-	SignedOut,
-	SignInButton,
-	UserButton,
-} from "@clerk/clerk-react";
+import { SignInButton, UserButton, useAuth } from "@clerk/react";
 import { Link, useLocation } from "@tanstack/react-router";
 
 const navItems = [
 	{ label: "Library", href: "/" },
 	{ label: "Add New", href: "/books/new" },
-	{ label: "Pricing", href: "/subscriptions" },
+	// { label: "Pricing", href: "/subscriptions" },
 ];
 
 const Navbar = () => {
 	const pathName = useLocation().pathname;
+	const { isSignedIn, isLoaded } = useAuth();
 	// const { user } = useUser();
 
 	return (
@@ -29,7 +25,6 @@ const Navbar = () => {
 					{navItems.map(({ label, href }) => {
 						const isActive =
 							pathName === href || (href !== "/" && pathName.startsWith(href));
-
 						return (
 							<Link
 								to={href}
@@ -44,21 +39,21 @@ const Navbar = () => {
 						);
 					})}
 
-					<div className="flex gap-7.5 items-center">
-						<SignedOut>
-							<SignInButton mode="modal" />
-						</SignedOut>
-						<SignedIn>
-							<div className="nav-user-link">
-								<UserButton />
-								{/* {user?.firstName && (
-									<Link to="/subscriptions" className="nav-user-name">
-										{user.firstName}
-									</Link>
-								)} */}
-							</div>
-						</SignedIn>
-					</div>
+					{isLoaded && (
+						<div className="flex gap-7.5 items-center">
+							{!isSignedIn && <SignInButton mode="modal" />}
+							{isSignedIn && (
+								<div className="nav-user-link">
+									<UserButton />
+									{/* {user?.firstName && (
+										<Link to="/subscriptions" className="nav-user-name">
+											{user.firstName}
+										</Link>
+									)} */}
+								</div>
+							)}
+						</div>
+					)}
 				</nav>
 			</div>
 		</header>

@@ -4,6 +4,8 @@ import {
 	voiceCategories,
 	voiceOptions,
 } from "#/lib/constants.ts";
+import { parsePDFFile } from "#/lib/utils";
+import { checkBookExists, createBook, saveBookSegments } from "#/server/book";
 import {
 	Form,
 	FormControl,
@@ -13,8 +15,10 @@ import {
 	FormMessage,
 } from "@/components/ui/form";
 import { UploadSchema } from "@/lib/zod";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ClientOnly, useRouter } from "@tanstack/react-router";
+import { upload } from "@vercel/blob/client";
 import { ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -23,6 +27,7 @@ import type { BookUploadFormValues } from "types";
 
 export function BookUploadForm() {
 	const { userId } = useAuth();
+	const router = useRouter();
 	const pdfInputRef = useRef<HTMLInputElement>(null);
 	const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,10 +49,132 @@ export function BookUploadForm() {
 	const pdfFile = watch("pdfFile");
 	const coverImage = watch("coverImage");
 
-	async function onSubmit(_values: BookUploadFormValues) {
+	async function onSubmit(values: BookUploadFormValues) {
 		if (!userId) {
 			toast.error("You must be logged in to upload a book");
 			return;
+		}
+
+		try {
+			const existsCheck = await checkBookExists({
+				data: { title: values.title },
+			});
+			if (existsCheck.exists && existsCheck.book) {
+				toast.info("Book with same title already exists.");
+				form.reset();
+				if (pdfInputRef.current) pdfInputRef.current.value = "";
+				if (coverInputRef.current) coverInputRef.current.value = "";
+				router.navigate({ to: `/books/${existsCheck.book.slug}` });
+				return;
+			}
+			const fileTitle = values.title.replace(/\s+/g, "-").toLowerCase();
+			const parsedPDF = await parsePDFFile(values.pdfFile);
+			if (parsedPDF.content.length === 0) {
+				toast.error(
+					"Failed to parse PDF. Please try again with a different file.",
+				);
+				form.reset();
+				if (pdfInputRef.current) pdfInputRef.current.value = "";
+				if (coverInputRef.current) coverInputRef.current.value = "";
+				return;
+			}
+
+			const uploadedPdfBlob = await upload(fileTitle, values.pdfFile, {
+				access: "public",
+				handleUploadUrl: "/api/upload",
+				contentType: "application/pdf",
+			});
+
+			let coverURL: string;
+
+			if (values.coverImage && values.coverImage instanceof File) {
+				const coverBlob = await upload(
+					`${fileTitle}_cover.png`,
+					values.coverImage,
+					{
+						access: "public",
+						handleUploadUrl: "/api/upload",
+						contentType: values.coverImage.type,
+					},
+				);
+				coverURL = coverBlob.url;
+			} else {
+				const res = await fetch(parsedPDF.cover);
+				const blob = await res.blob();
+				const coverBlob = await upload(`${fileTitle}_cover.png`, blob, {
+					access: "public",
+					handleUploadUrl: "/api/upload",
+					contentType: blob.type || "image/png",
+				});
+				coverURL = coverBlob.url;
+			}
+
+			const { title, author, voice } = values;
+
+			const book = await createBook({
+				data: {
+					title,
+					author,
+					clerkId: userId,
+					persona: voice,
+					fileURL: uploadedPdfBlob.url,
+					fileBlobKey: uploadedPdfBlob.pathname,
+					coverURL,
+					fileSize: pdfFile.size,
+				},
+			});
+
+			if (book?.alreadyExists) {
+				toast.info("Book with same title already exists.");
+				form.reset();
+				if (pdfInputRef.current) pdfInputRef.current.value = "";
+				if (coverInputRef.current) coverInputRef.current.value = "";
+				router.navigate({ to: `/books/${book.data.slug}` });
+				return;
+			}
+
+			if (!book.success) {
+				let errorMessage = "Failed to create book";
+				if (typeof book.error === "string" && book.error) {
+					errorMessage = book.error;
+				}
+				toast.error(errorMessage);
+				// if (book.isBillingError) {
+				// 	router.navigate({ to: "/subscriptions" });
+				// }
+				return;
+			}
+
+			const segments = await saveBookSegments({
+				data: {
+					bookId: book.data.id,
+					clerkId: userId,
+					segments: parsedPDF.content,
+				},
+			});
+
+			if (!segments.success) {
+				toast.error("Failed to save book segments");
+				throw new Error("Failed save book segments");
+			}
+
+			// Success: reset form and redirect
+			toast.success("Book uploaded successfully!");
+			form.reset();
+			if (pdfInputRef.current) pdfInputRef.current.value = "";
+			if (coverInputRef.current) coverInputRef.current.value = "";
+			router.navigate({ to: "/" });
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error
+					? error.message
+					: "An error occurred during upload";
+			console.error("Book upload error:", errorMessage);
+			toast.error("Failed to upload book. Please try again.");
+		} finally {
+			if (form.formState.isSubmitting) {
+				form.reset(form.getValues());
+			}
 		}
 	}
 
@@ -69,314 +196,311 @@ export function BookUploadForm() {
 				</div>
 			)}
 
-			<Form {...form}>
-				<form onSubmit={form.handleSubmit(onSubmit)}>
-					<div className="new-book-wrapper">
-						<div className="space-y-8">
-							<FormField
-								control={form.control}
-								name="pdfFile"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>Book PDF File</FormLabel>
-										<FormControl>
-											<div>
-												<input
-													ref={pdfInputRef}
-													type="file"
-													accept=".pdf,application/pdf"
-													suppressHydrationWarning
-													className="hidden"
-													onChange={(e) => {
-														const file = e.target.files?.[0];
-														if (file) field.onChange(file);
-													}}
-												/>
-												<div
-													className={`upload-dropzone border-2 border-dashed border-(--border-medium) ${pdfFile ? "upload-dropzone-uploaded" : ""}`}
-													role="button"
-													tabIndex={pdfFile ? -1 : 0}
-													aria-label="Upload PDF file"
-													aria-disabled={!!pdfFile}
-													suppressHydrationWarning
-													onClick={() =>
-														!pdfFile && pdfInputRef.current?.click()
-													}
-													onKeyDown={(e) => {
-														if (
-															!pdfFile &&
-															(e.key === "Enter" || e.key === " ")
-														) {
-															e.preventDefault();
-															pdfInputRef.current?.click();
-														}
-													}}
-												>
-													{pdfFile ? (
-														<div className="flex items-center gap-3 px-6 w-full">
-															<Upload className="w-6 h-6 shrink-0 text-[#663820]" />
-															<span className="upload-dropzone-text truncate flex-1 text-left">
-																{(pdfFile as File).name}
-															</span>
-															<button
-																type="button"
-																className="upload-dropzone-remove"
-																aria-label={`Remove ${(pdfFile as File).name}`}
-																suppressHydrationWarning
-																onClick={(e) => {
-																	e.stopPropagation();
-																	field.onChange(undefined);
-																	if (pdfInputRef.current)
-																		pdfInputRef.current.value = "";
-																}}
-															>
-																<X className="w-4 h-4" />
-															</button>
-														</div>
-													) : (
-														<div className="file-upload-shadow">
-															<Upload className="upload-dropzone-icon" />
-															<p className="upload-dropzone-text">
-																Click to upload PDF
-															</p>
-															<p className="upload-dropzone-hint">
-																PDF file (max 50MB)
-															</p>
-														</div>
-													)}
-												</div>
-											</div>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							{/* Cover Image Upload */}
-							<FormField
-								control={form.control}
-								name="coverImage"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>Cover Image (Optional)</FormLabel>
-										<FormControl>
-											<div>
-												<input
-													ref={coverInputRef}
-													type="file"
-													accept="image/jpeg,image/jpg,image/png,image/webp"
-													suppressHydrationWarning
-													className="hidden"
-													onChange={(e) => {
-														const file = e.target.files?.[0];
-														if (file) field.onChange(file);
-													}}
-												/>
-												<div
-													className={`upload-dropzone border-2 border-dashed border-(--border-medium) ${coverImage ? "upload-dropzone-uploaded" : ""}`}
-													role="button"
-													tabIndex={coverImage ? -1 : 0}
-													aria-label="Upload cover image"
-													aria-disabled={!!coverImage}
-													suppressHydrationWarning
-													onClick={() =>
-														!coverImage && coverInputRef.current?.click()
-													}
-													onKeyDown={(e) => {
-														if (
-															!coverImage &&
-															(e.key === "Enter" || e.key === " ")
-														) {
-															e.preventDefault();
-															coverInputRef.current?.click();
-														}
-													}}
-												>
-													{coverImage ? (
-														<div className="flex items-center gap-3 px-6 w-full">
-															<ImageIcon className="w-6 h-6 shrink-0 text-[#663820]" />
-															<span className="upload-dropzone-text truncate flex-1 text-left">
-																{(coverImage as File).name}
-															</span>
-															<button
-																type="button"
-																className="upload-dropzone-remove"
-																aria-label={`Remove ${(coverImage as File).name}`}
-																suppressHydrationWarning
-																onClick={(e) => {
-																	e.stopPropagation();
-																	field.onChange(undefined);
-																	if (coverInputRef.current)
-																		coverInputRef.current.value = "";
-																}}
-															>
-																<X className="w-4 h-4" />
-															</button>
-														</div>
-													) : (
-														<div className="file-upload-shadow">
-															<ImageIcon className="upload-dropzone-icon" />
-															<p className="upload-dropzone-text">
-																Click to upload cover image
-															</p>
-															<p className="upload-dropzone-hint">
-																Leave empty to auto-generate from PDF
-															</p>
-														</div>
-													)}
-												</div>
-											</div>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							{/* Title */}
-							<FormField
-								control={form.control}
-								name="title"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>Title</FormLabel>
-										<FormControl>
-											<input
-												{...field}
-												className="form-input"
-												placeholder="ex: Rich Dad Poor Dad"
-												suppressHydrationWarning
-											/>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							{/* Author */}
-							<FormField
-								control={form.control}
-								name="author"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>Author Name</FormLabel>
-										<FormControl>
-											<input
-												{...field}
-												className="form-input"
-												placeholder="ex: Robert Kiyosaki"
-												suppressHydrationWarning
-											/>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							{/* Voice Selector */}
-							<FormField
-								control={form.control}
-								name="voice"
-								render={({ field }) => (
-									<FormItem>
-										{/** biome-ignore lint/a11y/noLabelWithoutControl: Multiple form controls */}
-										<label className="form-label">Choose Assistant Voice</label>
-										<FormControl>
-											<div className="space-y-4">
-												{/* Male Voices */}
+			<ClientOnly>
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)}>
+						<div className="new-book-wrapper">
+							<div className="space-y-8">
+								<FormField
+									control={form.control}
+									name="pdfFile"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Book PDF File</FormLabel>
+											<FormControl>
 												<div>
-													<p className="text-sm font-semibold text-(--color-brand) mb-3">
-														Male Voices
-													</p>
-													<div className="voice-selector-options">
-														{voiceCategories.male.map((key) => {
-															const voice =
-																voiceOptions[key as keyof typeof voiceOptions];
-															const isSelected = field.value === key;
-															return (
-																<label
-																	key={key}
-																	className={`voice-selector-option cursor-pointer ${isSelected ? "voice-selector-option-selected" : "voice-selector-option-default"}`}
+													<input
+														ref={pdfInputRef}
+														type="file"
+														accept=".pdf,application/pdf"
+														className="hidden"
+														onChange={(e) => {
+															const file = e.target.files?.[0];
+															if (file) field.onChange(file);
+														}}
+													/>
+													<div
+														className={`upload-dropzone border-2 border-dashed border-(--border-medium) ${pdfFile ? "upload-dropzone-uploaded" : ""}`}
+														role="button"
+														tabIndex={pdfFile ? -1 : 0}
+														aria-label="Upload PDF file"
+														aria-disabled={!!pdfFile}
+														onClick={() =>
+															!pdfFile && pdfInputRef.current?.click()
+														}
+														onKeyDown={(e) => {
+															if (
+																!pdfFile &&
+																(e.key === "Enter" || e.key === " ")
+															) {
+																e.preventDefault();
+																pdfInputRef.current?.click();
+															}
+														}}
+													>
+														{pdfFile ? (
+															<div className="flex items-center gap-3 px-6 w-full">
+																<Upload className="w-6 h-6 shrink-0 text-[#663820]" />
+																<span className="upload-dropzone-text truncate flex-1 text-left">
+																	{(pdfFile as File).name}
+																</span>
+																<button
+																	type="button"
+																	className="upload-dropzone-remove"
+																	aria-label={`Remove ${(pdfFile as File).name}`}
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		field.onChange(undefined);
+																		if (pdfInputRef.current)
+																			pdfInputRef.current.value = "";
+																	}}
 																>
-																	<input
-																		type="radio"
-																		name="voice"
-																		value={key}
-																		checked={isSelected}
-																		onChange={() => field.onChange(key)}
-																		className="accent-[#663820] shrink-0 mt-0.5"
-																		suppressHydrationWarning
-																	/>
-																	<div className="min-w-0">
-																		<p className="font-semibold text-(--text-primary) text-sm leading-5">
-																			{voice.name}
-																		</p>
-																		<p className="text-xs text-(--color-brand) leading-4 mt-0.5">
-																			{voice.description}
-																		</p>
-																	</div>
-																</label>
-															);
-														})}
+																	<X className="w-4 h-4" />
+																</button>
+															</div>
+														) : (
+															<div className="file-upload-shadow">
+																<Upload className="upload-dropzone-icon" />
+																<p className="upload-dropzone-text">
+																	Click to upload PDF
+																</p>
+																<p className="upload-dropzone-hint">
+																	PDF file (max 50MB)
+																</p>
+															</div>
+														)}
 													</div>
 												</div>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
 
-												{/* Female Voices */}
+								{/* Cover Image Upload */}
+								<FormField
+									control={form.control}
+									name="coverImage"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Cover Image (Optional)</FormLabel>
+											<FormControl>
 												<div>
-													<p className="text-sm font-semibold text-(--color-brand) mb-3">
-														Female Voices
-													</p>
-													<div className="voice-selector-options">
-														{voiceCategories.female.map((key) => {
-															const voice =
-																voiceOptions[key as keyof typeof voiceOptions];
-															const isSelected = field.value === key;
-															return (
-																<label
-																	key={key}
-																	className={`voice-selector-option cursor-pointer ${isSelected ? "voice-selector-option-selected" : "voice-selector-option-default"}`}
+													<input
+														ref={coverInputRef}
+														type="file"
+														accept="image/jpeg,image/jpg,image/png,image/webp"
+														className="hidden"
+														onChange={(e) => {
+															const file = e.target.files?.[0];
+															if (file) field.onChange(file);
+														}}
+													/>
+													<div
+														className={`upload-dropzone border-2 border-dashed border-(--border-medium) ${coverImage ? "upload-dropzone-uploaded" : ""}`}
+														role="button"
+														tabIndex={coverImage ? -1 : 0}
+														aria-label="Upload cover image"
+														aria-disabled={!!coverImage}
+														onClick={() =>
+															!coverImage && coverInputRef.current?.click()
+														}
+														onKeyDown={(e) => {
+															if (
+																!coverImage &&
+																(e.key === "Enter" || e.key === " ")
+															) {
+																e.preventDefault();
+																coverInputRef.current?.click();
+															}
+														}}
+													>
+														{coverImage ? (
+															<div className="flex items-center gap-3 px-6 w-full">
+																<ImageIcon className="w-6 h-6 shrink-0 text-[#663820]" />
+																<span className="upload-dropzone-text truncate flex-1 text-left">
+																	{(coverImage as File).name}
+																</span>
+																<button
+																	type="button"
+																	className="upload-dropzone-remove"
+																	aria-label={`Remove ${(coverImage as File).name}`}
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		field.onChange(undefined);
+																		if (coverInputRef.current)
+																			coverInputRef.current.value = "";
+																	}}
 																>
-																	<input
-																		type="radio"
-																		name="voice"
-																		value={key}
-																		checked={isSelected}
-																		onChange={() => field.onChange(key)}
-																		className="accent-[#663820] shrink-0 mt-0.5"
-																		suppressHydrationWarning
-																	/>
-																	<div className="min-w-0">
-																		<p className="font-semibold text-(--text-primary) text-sm leading-5">
-																			{voice.name}
-																		</p>
-																		<p className="text-xs text-(--color-brand) leading-4 mt-0.5">
-																			{voice.description}
-																		</p>
-																	</div>
-																</label>
-															);
-														})}
+																	<X className="w-4 h-4" />
+																</button>
+															</div>
+														) : (
+															<div className="file-upload-shadow">
+																<ImageIcon className="upload-dropzone-icon" />
+																<p className="upload-dropzone-text">
+																	Click to upload cover image
+																</p>
+																<p className="upload-dropzone-hint">
+																	Leave empty to auto-generate from PDF
+																</p>
+															</div>
+														)}
 													</div>
 												</div>
-											</div>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
 
-							{/* Submit */}
-							<button
-								type="submit"
-								className="form-btn"
-								disabled={isSubmitting}
-								suppressHydrationWarning
-							>
-								Begin Synthesis
-							</button>
+								{/* Title */}
+								<FormField
+									control={form.control}
+									name="title"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Title</FormLabel>
+											<FormControl>
+												<input
+													{...field}
+													className="form-input"
+													placeholder="ex: Rich Dad Poor Dad"
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								{/* Author */}
+								<FormField
+									control={form.control}
+									name="author"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Author Name</FormLabel>
+											<FormControl>
+												<input
+													{...field}
+													className="form-input"
+													placeholder="ex: Robert Kiyosaki"
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								{/* Voice Selector */}
+								<FormField
+									control={form.control}
+									name="voice"
+									render={({ field }) => (
+										<FormItem>
+											{/** biome-ignore lint/a11y/noLabelWithoutControl: Multiple form controls */}
+											<label className="form-label">
+												Choose Assistant Voice
+											</label>
+											<FormControl>
+												<div className="space-y-4">
+													{/* Male Voices */}
+													<div>
+														<p className="text-sm font-semibold text-(--color-brand) mb-3">
+															Male Voices
+														</p>
+														<div className="voice-selector-options">
+															{voiceCategories.male.map((key) => {
+																const voice =
+																	voiceOptions[
+																		key as keyof typeof voiceOptions
+																	];
+																const isSelected = field.value === key;
+																return (
+																	<label
+																		key={key}
+																		className={`voice-selector-option cursor-pointer ${isSelected ? "voice-selector-option-selected" : "voice-selector-option-default"}`}
+																	>
+																		<input
+																			type="radio"
+																			name="voice"
+																			value={key}
+																			checked={isSelected}
+																			onChange={() => field.onChange(key)}
+																			className="accent-[#663820] shrink-0 mt-0.5"
+																		/>
+																		<div className="min-w-0">
+																			<p className="font-semibold text-(--text-primary) text-sm leading-5">
+																				{voice.name}
+																			</p>
+																			<p className="text-xs text-(--color-brand) leading-4 mt-0.5">
+																				{voice.description}
+																			</p>
+																		</div>
+																	</label>
+																);
+															})}
+														</div>
+													</div>
+
+													{/* Female Voices */}
+													<div>
+														<p className="text-sm font-semibold text-(--color-brand) mb-3">
+															Female Voices
+														</p>
+														<div className="voice-selector-options">
+															{voiceCategories.female.map((key) => {
+																const voice =
+																	voiceOptions[
+																		key as keyof typeof voiceOptions
+																	];
+																const isSelected = field.value === key;
+																return (
+																	<label
+																		key={key}
+																		className={`voice-selector-option cursor-pointer ${isSelected ? "voice-selector-option-selected" : "voice-selector-option-default"}`}
+																	>
+																		<input
+																			type="radio"
+																			name="voice"
+																			value={key}
+																			checked={isSelected}
+																			onChange={() => field.onChange(key)}
+																			className="accent-[#663820] shrink-0 mt-0.5"
+																		/>
+																		<div className="min-w-0">
+																			<p className="font-semibold text-(--text-primary) text-sm leading-5">
+																				{voice.name}
+																			</p>
+																			<p className="text-xs text-(--color-brand) leading-4 mt-0.5">
+																				{voice.description}
+																			</p>
+																		</div>
+																	</label>
+																);
+															})}
+														</div>
+													</div>
+												</div>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								{/* Submit */}
+								<button
+									type="submit"
+									className="form-btn"
+									disabled={isSubmitting}
+								>
+									Begin Synthesis
+								</button>
+							</div>
 						</div>
-					</div>
-				</form>
-			</Form>
+					</form>
+				</Form>
+			</ClientOnly>
 		</>
 	);
 }

@@ -20,7 +20,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.61.3",
+    "@clerk/tanstack-react-start": "^1.0.4",
+    "@clerk/ui": "^1.2.1",
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/serverless": "^1.0.2",
     "@neondatabase/vite-plugin-postgres": "^0.7.0",
