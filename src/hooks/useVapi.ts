@@ -25,7 +25,7 @@ const useLatestRef = <T>(value: T) => {
 
 let vapi: InstanceType<typeof Vapi>;
 
-const VAPI_API_KEY = process.env.VITE_VAPI_API_KEY;
+const VAPI_API_KEY = import.meta.env.VITE_VAPI_API_KEY;
 const TIMER_INTERVAL_MS = 1000;
 
 function getVapi() {
@@ -196,7 +196,7 @@ export const useVapi = (book: Book) => {
 				variableValues: {
 					title: book.title,
 					author: book.author,
-					bookId: book._id,
+					bookId: book.id,
 				},
 				voice: {
 					provider: "11labs" as const,

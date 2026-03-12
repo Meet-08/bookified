@@ -3,7 +3,7 @@ import { book, bookSegment } from "#/db/schema";
 import { generateSlug } from "#/lib/utils";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { CreateBook, TextSegment } from "types";
 
 export const checkBookExists = createServerFn()
@@ -113,6 +113,10 @@ export const getBookBySlug = createServerFn()
 	.inputValidator((input: { slug: string }) => input)
 	.handler(async ({ data }) => {
 		try {
+			const { userId } = await auth();
+			if (!userId) {
+				return { success: false, error: "Unauthorized" };
+			}
 			const dbBook = await db.query.book.findFirst({
 				where: eq(book.slug, data.slug),
 			});
@@ -122,6 +126,36 @@ export const getBookBySlug = createServerFn()
 			return { success: true, data: dbBook };
 		} catch (error) {
 			console.error("Error fetching book by slug: ", error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Unknown error",
+			};
+		}
+	});
+
+export const searchBookSegments = createServerFn()
+	.inputValidator(
+		(input: { bookId: string; query: string; limit: number }) => input,
+	)
+	.handler(async ({ data }) => {
+		try {
+			const { bookId, query, limit } = data;
+			const results = await db
+				.select({ content: bookSegment.content })
+				.from(bookSegment)
+				.where(
+					and(
+						eq(bookSegment.bookId, bookId),
+						sql`to_tsvector('english', ${bookSegment.content}) @@ websearch_to_tsquery('english', ${query})`,
+					),
+				)
+				.orderBy(
+					sql`ts_rank(to_tsvector('english', ${bookSegment.content}), websearch_to_tsquery('english', ${query})) DESC`,
+				)
+				.limit(limit);
+			return { success: true, data: results };
+		} catch (error) {
+			console.error("Error searching book segments: ", error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : "Unknown error",

@@ -17,6 +17,15 @@ To build this application for production:
 bun --bun run build
 ```
 
+To preview the production build locally:
+
+```bash
+bun run build
+bun run preview
+```
+
+`vite preview` is not the correct runtime for this app's Bun-targeted Nitro server output.
+
 ## Testing
 
 This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:

@@ -10,11 +10,11 @@ import z from "zod";
 // DATABASE MODELS
 // ============================================
 
-type Book = InferSelectModel<typeof book>;
+export type Book = InferSelectModel<typeof book>;
 
-type BookSegment = InferSelectModel<typeof bookSegment>;
+export type BookSegment = InferSelectModel<typeof bookSegment>;
 
-type VoiceSession = InferSelectModel<typeof voiceSession>;
+export type VoiceSession = InferSelectModel<typeof voiceSession>;
 
 
 // ============================================

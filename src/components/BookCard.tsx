@@ -1,9 +1,24 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import type { BookCardProps } from "types";
 
 const BookCard = ({ title, author, coverURL, slug }: BookCardProps) => {
+	const { userId } = useAuth();
+
 	return (
-		<Link to={`/books/$slug`} params={{ slug }}>
+		<Link
+			to={`/books/$slug`}
+			params={{ slug }}
+			onClick={(event) => {
+				if (userId) {
+					return;
+				}
+
+				event.preventDefault();
+				toast.error("You must be logged in to view this book.");
+			}}
+		>
 			<article className="book-card">
 				<figure className="book-card-figure">
 					<div className="book-card-cover-wrapper">

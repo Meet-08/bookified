@@ -97,9 +97,9 @@ export const ACCEPTED_IMAGE_TYPES = [
 	"image/webp",
 ];
 
-// Pre-configured VAPI assistant ID (hardcoded for this app)
-// biome-ignore lint/style/noNonNullAssertion: <- We know this env variable is set, and it's easier to manage it here than in multiple places>
-export const ASSISTANT_ID = process.env.VITE_ASSISTANT_ID!;
+// Pre-configured VAPI assistant ID
+export const ASSISTANT_ID =
+	import.meta.env.VITE_ASSISTANT_ID ?? process.env.VITE_ASSISTANT_ID ?? "";
 
 // 11Labs Voice IDs - Optimized for conversational AI
 // Voices selected for natural, engaging book conversations
