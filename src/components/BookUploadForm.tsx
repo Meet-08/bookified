@@ -5,7 +5,12 @@ import {
 	voiceOptions,
 } from "#/lib/constants.ts";
 import { parsePDFFile } from "#/lib/utils";
-import { checkBookExists, createBook, saveBookSegments } from "#/server/book";
+import {
+	checkBookExists,
+	checkBookLimit,
+	createBook,
+	saveBookSegments,
+} from "#/server/book";
 import {
 	Form,
 	FormControl,
@@ -56,6 +61,17 @@ export function BookUploadForm() {
 		}
 
 		try {
+			const limitCheck = await checkBookLimit();
+			if (!limitCheck.allowed) {
+				toast.error(limitCheck.error ?? "Book limit reached.", {
+					action: {
+						label: "Upgrade",
+						onClick: () => router.navigate({ to: "/subscriptions" }),
+					},
+				});
+				return;
+			}
+
 			const existsCheck = await checkBookExists({
 				data: { title: values.title },
 			});
@@ -138,10 +154,16 @@ export function BookUploadForm() {
 				if (typeof book.error === "string" && book.error) {
 					errorMessage = book.error;
 				}
-				toast.error(errorMessage);
-				// if (book.isBillingError) {
-				// 	router.navigate({ to: "/subscriptions" });
-				// }
+				if (book.limitReached) {
+					toast.error(errorMessage, {
+						action: {
+							label: "Upgrade",
+							onClick: () => router.navigate({ to: "/subscriptions" }),
+						},
+					});
+				} else {
+					toast.error(errorMessage);
+				}
 				return;
 			}
 

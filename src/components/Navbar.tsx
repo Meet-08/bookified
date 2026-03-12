@@ -1,17 +1,17 @@
 import { cn } from "#/lib/utils";
-import { SignInButton, UserButton, useAuth } from "@clerk/react";
+import { SignInButton, UserButton, useAuth, useUser } from "@clerk/react";
 import { Link, useLocation } from "@tanstack/react-router";
 
 const navItems = [
 	{ label: "Library", href: "/" },
 	{ label: "Add New", href: "/books/new" },
-	// { label: "Pricing", href: "/subscriptions" },
+	{ label: "Pricing", href: "/subscriptions" },
 ];
 
 const Navbar = () => {
 	const pathName = useLocation().pathname;
 	const { isSignedIn, isLoaded } = useAuth();
-	// const { user } = useUser();
+	const { user } = useUser();
 
 	return (
 		<header className="w-full fixed z-50 bg-(--bg-primary)">
@@ -45,11 +45,11 @@ const Navbar = () => {
 							{isSignedIn && (
 								<div className="nav-user-link">
 									<UserButton />
-									{/* {user?.firstName && (
+									{user?.firstName && (
 										<Link to="/subscriptions" className="nav-user-name">
 											{user.firstName}
 										</Link>
-									)} */}
+									)}
 								</div>
 							)}
 						</div>

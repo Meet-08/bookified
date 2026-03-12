@@ -1,10 +1,33 @@
 import { db } from "#/db/index";
 import { book, bookSegment } from "#/db/schema";
 import { generateSlug } from "#/lib/utils";
+import { checkBookUploadAllowed } from "#/server/subscription";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, sql } from "drizzle-orm";
 import type { CreateBook, TextSegment } from "types";
+
+export const checkBookLimit = createServerFn().handler(async () => {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return { allowed: false, error: "Unauthorized" };
+		}
+		const result = await checkBookUploadAllowed(userId);
+		if (!result.allowed) {
+			return {
+				allowed: false,
+				error: `Book limit reached. Your plan allows up to ${result.limit} book${
+					result.limit === 1 ? "" : "s"
+				}. Upgrade your plan to add more.`,
+			};
+		}
+		return { allowed: true };
+	} catch (error) {
+		console.error("Error checking book limit:", error);
+		return { allowed: false, error: "Failed to check book limit" };
+	}
+});
 
 export const checkBookExists = createServerFn()
 	.inputValidator((input: { title: string }) => input)
@@ -27,7 +50,18 @@ export const checkBookExists = createServerFn()
 
 export const getAllBooks = createServerFn().handler(async () => {
 	try {
-		const books = await db.select().from(book);
+		const { userId } = await auth();
+		if (!userId) {
+			return {
+				success: false,
+				error: "Unauthorized",
+			};
+		}
+
+		const books = await db.query.book.findMany({
+			where: eq(book.clerkId, userId),
+			orderBy: [sql`${book.id} DESC`],
+		});
 		return {
 			success: true,
 			data: books,
@@ -73,6 +107,15 @@ export const createBook = createServerFn({ method: "POST" })
 
 			if (!userId || userId !== clerkId) {
 				return { success: false, error: "Unauthorized" };
+			}
+
+			const bookLimitCheck = await checkBookUploadAllowed(userId);
+			if (!bookLimitCheck.allowed) {
+				return {
+					success: false,
+					error: `Book limit reached. Your plan allows up to ${bookLimitCheck.limit} book${bookLimitCheck.limit === 1 ? "" : "s"}. Upgrade your plan to add more.`,
+					limitReached: true,
+				};
 			}
 
 			if (!coverURL) {

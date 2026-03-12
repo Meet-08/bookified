@@ -1,5 +1,6 @@
 import { db } from "#/db/index";
 import { voiceSession } from "#/db/schema";
+import { checkSessionAllowed } from "#/server/subscription";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
@@ -17,6 +18,15 @@ export const startVoiceSession = createServerFn({ method: "POST" })
 
 			if (!userId) {
 				return { success: false, error: "Unauthorized" };
+			}
+
+			const sessionLimitCheck = await checkSessionAllowed(userId);
+			if (!sessionLimitCheck.allowed) {
+				return {
+					success: false,
+					error: `Monthly session limit reached. Your plan allows up to ${sessionLimitCheck.limit} session${sessionLimitCheck.limit === 1 ? "" : "s"} per month. Upgrade your plan to continue.`,
+					limitReached: true,
+				};
 			}
 
 			const [session] = await db

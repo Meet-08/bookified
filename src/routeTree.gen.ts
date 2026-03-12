@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BooksNewRouteImport } from './routes/books/new'
 import { Route as BooksSlugRouteImport } from './routes/books/$slug'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
 import { Route as ApiVapiSearchBookRouteImport } from './routes/api/vapi.search-book'
 
+const SubscriptionsRoute = SubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +49,7 @@ const ApiVapiSearchBookRoute = ApiVapiSearchBookRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/subscriptions': typeof SubscriptionsRoute
   '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/subscriptions': typeof SubscriptionsRoute
   '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/subscriptions': typeof SubscriptionsRoute
   '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
@@ -67,6 +76,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/subscriptions'
     | '/api/upload'
     | '/books/$slug'
     | '/books/new'
@@ -74,6 +84,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/subscriptions'
     | '/api/upload'
     | '/books/$slug'
     | '/books/new'
@@ -81,6 +92,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/subscriptions'
     | '/api/upload'
     | '/books/$slug'
     | '/books/new'
@@ -89,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SubscriptionsRoute: typeof SubscriptionsRoute
   ApiUploadRoute: typeof ApiUploadRoute
   BooksSlugRoute: typeof BooksSlugRoute
   BooksNewRoute: typeof BooksNewRoute
@@ -97,6 +110,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/subscriptions': {
+      id: '/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/subscriptions'
+      preLoaderRoute: typeof SubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -137,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SubscriptionsRoute: SubscriptionsRoute,
   ApiUploadRoute: ApiUploadRoute,
   BooksSlugRoute: BooksSlugRoute,
   BooksNewRoute: BooksNewRoute,

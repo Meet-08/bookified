@@ -15,7 +15,7 @@ function App() {
 		<main className="wrapper container">
 			<Hero />
 
-			{error && <p className="error">{error}</p>}
+			{error !== "Unauthorized" && <p className="error">{error}</p>}
 
 			<div className="library-books-grid">
 				{books?.map((book) => (
