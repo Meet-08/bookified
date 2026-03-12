@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BooksNewRouteImport } from './routes/books/new'
 import { Route as BooksSlugRouteImport } from './routes/books/$slug'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
+import { Route as ApiVapiSearchBookRouteImport } from './routes/api/vapi.search-book'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const ApiUploadRoute = ApiUploadRouteImport.update({
   path: '/api/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVapiSearchBookRoute = ApiVapiSearchBookRouteImport.update({
+  id: '/api/vapi/search-book',
+  path: '/api/vapi/search-book',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
+  '/api/vapi/search-book': typeof ApiVapiSearchBookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
+  '/api/vapi/search-book': typeof ApiVapiSearchBookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,30 @@ export interface FileRoutesById {
   '/api/upload': typeof ApiUploadRoute
   '/books/$slug': typeof BooksSlugRoute
   '/books/new': typeof BooksNewRoute
+  '/api/vapi/search-book': typeof ApiVapiSearchBookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/upload' | '/books/$slug' | '/books/new'
+  fullPaths:
+    | '/'
+    | '/api/upload'
+    | '/books/$slug'
+    | '/books/new'
+    | '/api/vapi/search-book'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/upload' | '/books/$slug' | '/books/new'
-  id: '__root__' | '/' | '/api/upload' | '/books/$slug' | '/books/new'
+  to:
+    | '/'
+    | '/api/upload'
+    | '/books/$slug'
+    | '/books/new'
+    | '/api/vapi/search-book'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/upload'
+    | '/books/$slug'
+    | '/books/new'
+    | '/api/vapi/search-book'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +92,7 @@ export interface RootRouteChildren {
   ApiUploadRoute: typeof ApiUploadRoute
   BooksSlugRoute: typeof BooksSlugRoute
   BooksNewRoute: typeof BooksNewRoute
+  ApiVapiSearchBookRoute: typeof ApiVapiSearchBookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +125,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/vapi/search-book': {
+      id: '/api/vapi/search-book'
+      path: '/api/vapi/search-book'
+      fullPath: '/api/vapi/search-book'
+      preLoaderRoute: typeof ApiVapiSearchBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUploadRoute: ApiUploadRoute,
   BooksSlugRoute: BooksSlugRoute,
   BooksNewRoute: BooksNewRoute,
+  ApiVapiSearchBookRoute: ApiVapiSearchBookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

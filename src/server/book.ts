@@ -109,6 +109,26 @@ export const createBook = createServerFn({ method: "POST" })
 		}
 	});
 
+export const getBookBySlug = createServerFn()
+	.inputValidator((input: { slug: string }) => input)
+	.handler(async ({ data }) => {
+		try {
+			const dbBook = await db.query.book.findFirst({
+				where: eq(book.slug, data.slug),
+			});
+			if (!dbBook) {
+				return { success: false, data: null };
+			}
+			return { success: true, data: dbBook };
+		} catch (error) {
+			console.error("Error fetching book by slug: ", error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Unknown error",
+			};
+		}
+	});
+
 export const saveBookSegments = createServerFn({ method: "POST" })
 	.inputValidator(
 		(input: { bookId: string; clerkId: string; segments: TextSegment[] }) =>
