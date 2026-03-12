@@ -16,7 +16,13 @@ const config = defineConfig({
 		tsconfigPaths({ projects: ["./tsconfig.json"] }),
 		tailwindcss(),
 		tanstackStart(),
-		nitro(),
+		nitro({
+			vercel: {
+				functions: {
+					runtime: "bun1.x",
+				},
+			},
+		}),
 		viteReact(),
 	],
 });
