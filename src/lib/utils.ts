@@ -8,14 +8,21 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
-export function generateSlug(text: string): string {
-	return text
+export function generateSlug(text: string, userId?: string): string {
+	const baseSlug = text
 		.replace(/\.[^/.]+$/, "") // Remove file extension (.pdf, .txt, etc.)
 		.toLowerCase() // Convert to lowercase
 		.trim() // Remove whitespace from both ends
 		.replace(/[^\w\s-]/g, "") // Remove special characters (keep letters, numbers, spaces, hyphens)
 		.replace(/[\s_]+/g, "-") // Replace spaces and underscores with hyphens
 		.replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+
+	if (!userId) return baseSlug;
+
+	const userSlugPart = userId.toLowerCase().replace(/[^a-z0-9]/g, "");
+	if (!userSlugPart) return baseSlug;
+
+	return `${baseSlug}-${userSlugPart}`;
 }
 
 export const splitIntoSegments = (

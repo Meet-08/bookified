@@ -1,3 +1,4 @@
+import { useSubscription } from "#/hooks/useSubscription";
 import { getVoice } from "#/lib/utils";
 import { endVoiceSession, startVoiceSession } from "#/server/session";
 
@@ -27,6 +28,7 @@ let vapi: InstanceType<typeof Vapi>;
 
 const VAPI_API_KEY = import.meta.env.VITE_VAPI_API_KEY;
 const TIMER_INTERVAL_MS = 1000;
+const FALLBACK_MAX_SESSION_MINUTES = 15;
 
 function getVapi() {
 	if (!vapi) {
@@ -40,8 +42,7 @@ function getVapi() {
 
 export const useVapi = (book: Book) => {
 	const { userId } = useAuth();
-
-	//TODO: Implements limits
+	const { limits } = useSubscription();
 
 	const [status, setStatus] = useState<CallStatus>("idle");
 	const [messages, setMessages] = useState<Messages[]>([]);
@@ -55,12 +56,26 @@ export const useVapi = (book: Book) => {
 	const isStoppingRef = useRef(false);
 
 	const durationRef = useLatestRef(duration);
+	const maxSessionMinutes =
+		limits.maxSessionMinutes || FALLBACK_MAX_SESSION_MINUTES;
+	const maxDurationSeconds = maxSessionMinutes * 60;
+	const maxDurationSecondsRef = useLatestRef(maxDurationSeconds);
 	const voice = book.persona || DEFAULT_VOICE;
 
 	const isActive =
 		status === "listening" || status === "thinking" || status === "speaking";
 
-	// const maxDurationRef = useLatestRef(limits.maxSessionMinutes * 60);
+	useEffect(() => {
+		if (!isActive) return;
+		if (duration < maxDurationSecondsRef.current) return;
+		if (isStoppingRef.current) return;
+
+		isStoppingRef.current = true;
+		setLimitError(
+			`Session duration limit reached (${maxSessionMinutes} minute${maxSessionMinutes === 1 ? "" : "s"}).`,
+		);
+		void getVapi().stop();
+	}, [duration, isActive, maxDurationSecondsRef, maxSessionMinutes]);
 
 	useEffect(() => {
 		const vapiInstance = getVapi();
@@ -243,6 +258,7 @@ export const useVapi = (book: Book) => {
 		stop,
 		clearErrors,
 		limitError,
+		maxSessionMinutes,
 	};
 };
 

@@ -1,231 +1,237 @@
-Welcome to your new TanStack Start app!
+# Bookified
 
-# Getting Started
+Bookified is a TanStack Start application that turns uploaded PDF books into voice-interactive experiences.
 
-To run this application:
+The app lets users:
+
+- Upload a PDF (with optional custom cover image)
+- Parse and segment text client-side
+- Persist book metadata and searchable text segments in PostgreSQL (Drizzle ORM)
+- Start AI voice conversations with Vapi about the selected book
+- Enforce plan-based limits using Clerk billing plans
+
+## Core Stack
+
+- Runtime and package manager: Bun
+- App framework: TanStack Start + TanStack Router
+- UI: React 19 + Tailwind CSS v4
+- Auth and plans: Clerk
+- Database: Neon Postgres + Drizzle ORM
+- File storage: Vercel Blob
+- Voice assistant: Vapi (with ElevenLabs voice settings)
+
+## Feature Breakdown
+
+### 1) Library and Book Management
+
+- Home route (`/`) loads signed-in user books from the database.
+- Books are isolated per Clerk user via `clerkId`.
+- Book identity in URLs uses a generated slug from title.
+
+### 2) PDF Upload and Processing Pipeline
+
+- Upload form validates:
+  - PDF required, up to 50MB
+  - Optional cover image up to 10MB
+  - Title and author required
+  - Voice selection required
+- PDF is parsed in browser via `pdfjs-dist`.
+- Text is split into searchable segments with overlap for better context continuity.
+- PDF and cover image are uploaded through `/api/upload` using Vercel Blob token flow.
+- Database write sequence:
+  1. Create `books` row
+  2. Insert many `book_segments`
+  3. Update `books.total_segments`
+
+### 3) Voice Conversation Flow
+
+- Book detail route (`/books/$slug`) renders the voice console.
+- Starting conversation:
+  1. Calls server function to create a `voice_sessions` record
+  2. Checks plan quota before session starts
+  3. Starts Vapi assistant with book context (`title`, `author`, `bookId`)
+- During call:
+  - Transcript messages stream into UI (partial and final)
+  - Session timer runs in client
+- Ending call:
+  - Stops Vapi call
+  - Persists `endedAt` and `durationSeconds`
+
+### 4) Semantic Book Search for Vapi Tool Calls
+
+- Endpoint: `POST /api/vapi/search-book`
+- Accepts Vapi tool calls for `searchBook`
+- Executes full-text search against `book_segments.content`
+- Returns top ranked excerpts (default limit: 3)
+
+### 5) Subscription and Limits
+
+- Plan detection uses Clerk `has({ plan: ... })`.
+- Plan limits (configured in `src/lib/subscriptions.ts`):
+  - Free: 1 book, 5 sessions/month, 5 minutes/session
+  - Standard: 10 books, 100 sessions/month, 15 minutes/session
+  - Pro: 100 books, unlimited monthly sessions, 60 minutes/session
+- Enforced server-side in:
+  - Book upload checks
+  - Voice session start checks
+
+## Architecture Overview
+
+### Routing Model
+
+File-based routing under `src/routes`:
+
+- `/` - library view (book listing)
+- `/books/new` - upload + ingestion flow
+- `/books/$slug` - voice chat for one book
+- `/subscriptions` - Clerk pricing table
+- `/api/upload` - Vercel Blob upload token endpoint
+- `/api/vapi/search-book` - retrieval endpoint for Vapi tool calls
+
+### Server-side Execution Patterns
+
+The project mixes two server patterns:
+
+- TanStack server functions (`createServerFn`) for typed internal app calls:
+  - Book CRUD/read/search helper functions
+  - Session lifecycle methods
+  - Plan-limit checks
+- Route handlers for external HTTP integrations:
+  - Blob uploads
+  - Vapi retrieval webhook/tool endpoint
+
+### Data Layer
+
+- DB client lives in `src/db/index.ts`.
+- Schema is defined in `src/db/schema.ts`.
+- SQL migrations are generated under `drizzle/`.
+
+## Database Schema
+
+### `books`
+
+- Stores book metadata and ownership
+- Key fields: `id`, `clerk_id`, `title`, `slug`, `author`, `persona`, `file_url`, `cover_url`, `total_segments`
+- `slug` is unique
+
+### `book_segments`
+
+- Stores segmented text for search and retrieval
+- Key fields: `book_id`, `segment_index`, `content`, `word_count`, `page_number`
+- Indexes:
+  - unique (`book_id`, `segment_index`)
+  - btree (`book_id`, `page_number`)
+  - btree (`segment_index`)
+  - GIN full-text index on `to_tsvector('english', content)`
+
+### `voice_sessions`
+
+- Tracks session usage for billing/limit enforcement
+- Key fields: `book_id`, `clerk_id`, `started_at`, `ended_at`, `duration_seconds`, `billing_period_start`
+- Indexes:
+  - btree (`billing_period_start`)
+  - btree (`clerk_id`, `billing_period_start`)
+
+## Environment Variables
+
+Create `.env.local` (or `.env`) with the following keys:
+
+- `DATABASE_URL`
+  - Required for Drizzle and runtime DB access.
+
+- `VITE_CLERK_PUBLISHABLE_KEY`
+  - Required by the Clerk client provider.
+
+- `BLOB_READ_WRITE_TOKEN`
+  - Required by `/api/upload` for Vercel Blob token generation.
+
+- `VITE_VAPI_API_KEY`
+  - Required in browser for Vapi SDK initialization.
+
+- `VITE_ASSISTANT_ID`
+  - Assistant ID used when starting voice calls.
+
+## Local Development
+
+### 1) Install dependencies
 
 ```bash
 bun install
-bun --bun run dev
 ```
 
-# Building For Production
-
-To build this application for production:
+### 2) Configure environment
 
 ```bash
-bun --bun run build
+cp .env.example .env.local
 ```
 
-To preview the production build locally:
+If `.env.example` is not present in your local clone, create `.env.local` manually with the keys above.
+
+### 3) Run migrations
+
+```bash
+bun run db:generate
+bun run db:migrate
+```
+
+For schema synchronization workflows:
+
+```bash
+bun run db:push
+```
+
+### 4) Start dev server
+
+```bash
+bun run dev
+```
+
+App runs on port `3000` by default.
+
+## Build, Preview, Quality
 
 ```bash
 bun run build
 bun run preview
 ```
 
-`vite preview` is not the correct runtime for this app's Bun-targeted Nitro server output.
-
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
-
 ```bash
-bun --bun run test
+bun run test
+bun run lint
+bun run format
+bun run check
 ```
 
-## Styling
+## Project Structure (High Signal)
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `bun install @tailwindcss/vite tailwindcss -D`
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
-```bash
-bun --bun run lint
-bun --bun run format
-bun --bun run check
+```text
+src/
+  components/         UI and feature components (upload, transcript, voice controls)
+  db/                 Drizzle client + schema
+  hooks/              voice and subscription hooks
+  integrations/clerk/ Clerk provider wiring
+  lib/                constants, validation, utils, plan configuration
+  routes/             file-based pages and API handlers
+  server/             server functions (books, sessions, subscription checks)
+drizzle/              migration SQL and schema snapshots
+public/assets/        app artwork and branding assets
 ```
 
-## Setting up Neon
+## Operational Notes
 
-When running the `dev` command, the `@neondatabase/vite-plugin-postgres` will identify there is not a database setup. It will then create and seed a claimable database.
+- Upload + parsing happens in the browser; very large PDFs may affect client memory and processing time.
+- API route file naming and route path generation are handled by TanStack route generation (`routeTree.gen.ts`).
 
-It is the same process as [Neon Launchpad](https://neon.new).
+## Deployment Notes
 
-> [!IMPORTANT]
-> Claimable databases expire in 72 hours.
+- Vite + Nitro config is present for Bun-based server output and Vercel function runtime settings.
+- Ensure all env vars listed above are configured in the deployment platform.
 
-## Setting up Clerk
+## Maintainers
 
-- Set the `VITE_CLERK_PUBLISHABLE_KEY` in your `.env.local`.
+If you extend this codebase, update this README when changing:
 
-## Shadcn
-
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
-
-```bash
-pnpm dlx shadcn@latest add button
-```
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "My App" },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-});
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from "@tanstack/react-start";
-
-const getServerTime = createServerFn({
-  method: "GET",
-}).handler(async () => {
-  return new Date().toISOString();
-});
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState("");
-
-  useEffect(() => {
-    getServerTime().then(setTime);
-  }, []);
-
-  return <div>Server time: {time}</div>;
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from "@tanstack/react-router";
-import { json } from "@tanstack/react-start";
-
-export const Route = createFileRoute("/api/hello")({
-  server: {
-    handlers: {
-      GET: () => json({ message: "Hello, World!" }),
-    },
-  },
-});
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from "@tanstack/react-router";
-
-export const Route = createFileRoute("/people")({
-  loader: async () => {
-    const response = await fetch("https://swapi.dev/api/people");
-    return response.json();
-  },
-  component: PeopleComponent,
-});
-
-function PeopleComponent() {
-  const data = Route.useLoaderData();
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  );
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+- routes/endpoints
+- schema or migrations
+- environment variables
+- subscription limit logic

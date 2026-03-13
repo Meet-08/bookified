@@ -38,6 +38,7 @@ const VapiControls = ({ book }: { book: Book }) => {
 		stop,
 		clearErrors,
 		limitError,
+		maxSessionMinutes,
 	} = useVapi(book);
 
 	const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
@@ -102,7 +103,8 @@ const VapiControls = ({ book }: { book: Book }) => {
 
 						<div className="vapi-status-indicator rounded-full py-1.5 px-4">
 							<span className="vapi-status-text text-sm font-medium">
-								{formatDuration(duration)} / 15:00
+								{formatDuration(duration)} /{" "}
+								{formatDuration(maxSessionMinutes * 60)}
 							</span>
 						</div>
 					</div>

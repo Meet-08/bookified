@@ -33,9 +33,14 @@ export const checkBookExists = createServerFn()
 	.inputValidator((input: { title: string }) => input)
 	.handler(async ({ data }) => {
 		try {
-			const slug = generateSlug(data.title);
+			const { userId } = await auth();
+			if (!userId) {
+				return { exists: false, error: "Unauthorized" };
+			}
+
+			const slug = generateSlug(data.title, userId);
 			const dbBook = await db.query.book.findFirst({
-				where: eq(book.slug, slug),
+				where: and(eq(book.slug, slug), eq(book.clerkId, userId)),
 			});
 			if (!dbBook) return { exists: false };
 			return { exists: true, book: dbBook };
@@ -90,9 +95,16 @@ export const createBook = createServerFn({ method: "POST" })
 				persona,
 				coverURL,
 			} = data;
-			const slug = generateSlug(title);
+
+			const { userId } = await auth();
+
+			if (!userId || userId !== clerkId) {
+				return { success: false, error: "Unauthorized" };
+			}
+
+			const slug = generateSlug(title, userId);
 			const existingBook = await db.query.book.findFirst({
-				where: eq(book.slug, slug),
+				where: and(eq(book.slug, slug), eq(book.clerkId, userId)),
 			});
 
 			if (existingBook) {
@@ -101,12 +113,6 @@ export const createBook = createServerFn({ method: "POST" })
 					data: existingBook,
 					alreadyExists: true,
 				};
-			}
-
-			const { userId } = await auth();
-
-			if (!userId || userId !== clerkId) {
-				return { success: false, error: "Unauthorized" };
 			}
 
 			const bookLimitCheck = await checkBookUploadAllowed(userId);
@@ -161,7 +167,7 @@ export const getBookBySlug = createServerFn()
 				return { success: false, error: "Unauthorized" };
 			}
 			const dbBook = await db.query.book.findFirst({
-				where: eq(book.slug, data.slug),
+				where: and(eq(book.slug, data.slug), eq(book.clerkId, userId)),
 			});
 			if (!dbBook) {
 				return { success: false, data: null };
