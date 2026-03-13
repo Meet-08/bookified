@@ -10,6 +10,10 @@ The app lets users:
 - Start AI voice conversations with Vapi about the selected book
 - Enforce plan-based limits using Clerk billing plans
 
+## Preview
+
+![Bookified App Screenshot](preview.png)
+
 ## Core Stack
 
 - Runtime and package manager: Bun
